@@ -1,22 +1,20 @@
 services:
   dev-sandbox:
-    build: .
     image: ai-dev-sandbox:latest
     volumes:
-      # Workspace: the target project (default: this directory)
+      # Workspace: this project
       - ${SANDBOX_WORKSPACE:-.}:/workspace/project:rw
 
-      # Self-reference: this sandbox project, for self-improvement
-      - .:/workspace/sandbox:rw
-
-      # Auth credentials (read-only) — mounted at staging paths;
-      # entrypoint symlinks them into place
+      # Auth credentials (read-only)
       - ~/.claude/.credentials.json:/home/dev/.claude-credentials/.credentials.json:ro
       - ~/.local/share/opencode/auth.json:/home/dev/.local/share/opencode/auth.json:ro
 
       # Git identity (read-only)
       - ~/.gitconfig:/home/dev/.gitconfig:ro
       - ~/.ssh:/home/dev/.ssh:ro
+
+      # Additional context directories (uncomment/add as needed)
+      # - ~/shared-libs:/workspace/context/shared-libs:ro
 
     environment:
       - CLAUDE_CONFIG_DIR=/home/dev/.claude

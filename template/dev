@@ -1,8 +1,12 @@
 #!/bin/bash
 set -euo pipefail
 
-# Resolve the directory where this script lives (works from any cwd)
+# Standalone launcher for the AI development sandbox.
+# Copy this file and docker-compose.yaml into your project root.
+# Requires: ai-dev-sandbox:latest image (build once from the main sandbox repo)
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SANDBOX_IMAGE="ai-dev-sandbox:latest"
 
 usage() {
     cat <<'EOF'
@@ -14,7 +18,6 @@ Commands:
   claude [args...]     Launch Claude Code (permissive mode)
   opencode [args...]   Launch OpenCode
   bash                 Interactive shell (default)
-  build                Build/rebuild the sandbox image
 
 Options:
   -w, --workspace DIR       Override workspace directory (default: cwd)
@@ -32,22 +35,15 @@ EOF
 
 # ---------------------------------------------------------------------------
 # Preflight: ensure host paths exist so Docker doesn't create them as
-# root-owned directories. This is the main ergonomic win — run ./dev and
-# everything Just Works even on a fresh machine.
+# root-owned directories.
 # ---------------------------------------------------------------------------
 preflight() {
-    # Directories that must exist (Docker bind-mounts create them as root if missing)
     mkdir -p "$HOME/.ssh"
     mkdir -p "$HOME/.claude"
     mkdir -p "$HOME/.local/share/opencode"
 
-    # Files that are bind-mounted directly — if missing, Docker creates a
-    # *directory* at that path, which breaks everything downstream.
-    # Touch them as empty files so the mount works; the entrypoint and tools
-    # handle the "empty/missing credentials" case gracefully.
     [[ -f "$HOME/.gitconfig" ]] || touch "$HOME/.gitconfig"
 
-    # Check for docker compose
     if ! command -v docker &>/dev/null; then
         echo "Error: docker is not installed or not in PATH" >&2
         exit 1
@@ -56,15 +52,10 @@ preflight() {
         echo "Error: 'docker compose' plugin not available" >&2
         exit 1
     fi
-}
-
-# ---------------------------------------------------------------------------
-# Ensure the sandbox image exists, building it if necessary
-# ---------------------------------------------------------------------------
-ensure_image() {
-    if ! docker image inspect ai-dev-sandbox:latest &>/dev/null; then
-        echo "Image ai-dev-sandbox:latest not found — building..." >&2
-        docker compose -f "$SCRIPT_DIR/docker-compose.yaml" build
+    if ! docker image inspect "$SANDBOX_IMAGE" &>/dev/null; then
+        echo "Error: image $SANDBOX_IMAGE not found. Build it first from the main sandbox repo:" >&2
+        echo "  cd /path/to/ai-development-sandbox && ./dev build" >&2
+        exit 1
     fi
 }
 
@@ -110,33 +101,18 @@ done
 
 COMMAND="${1:-bash}"
 
-# Handle build command separately (no preflight needed beyond docker check)
-if [[ "$COMMAND" == "build" ]]; then
-    preflight
-    exec docker compose -f "$SCRIPT_DIR/docker-compose.yaml" build
-fi
-
-# Shift past the command name so remaining args are forwarded
 if [[ $# -gt 0 ]]; then
     shift
 fi
 
-# ---------------------------------------------------------------------------
-# Preflight and image check
-# ---------------------------------------------------------------------------
 preflight
-ensure_image
 
-# Export SANDBOX_WORKSPACE for compose variable interpolation.
 # Default to cwd so the caller's project is mounted — not the compose file's
 # directory (Docker Compose resolves relative paths relative to the compose file).
 export SANDBOX_WORKSPACE="${WORKSPACE:-$PWD}"
 
 # ---------------------------------------------------------------------------
-# Build compose file list, skipping mounts for missing credential files.
-# Docker bind-mounts create empty *directories* when the source file doesn't
-# exist — the credential staging paths expect files, not dirs, so we must
-# omit these mounts entirely when the host file is absent.
+# Skip mounts for missing credential files
 # ---------------------------------------------------------------------------
 CLAUDE_CREDS="$HOME/.claude/.credentials.json"
 OPENCODE_AUTH="$HOME/.local/share/opencode/auth.json"
@@ -148,8 +124,6 @@ SKIP_OPENCODE_AUTH=false
 [[ -f "$OPENCODE_AUTH" ]]  || { SKIP_OPENCODE_AUTH=true;  echo "Note: $OPENCODE_AUTH not found — skipping mount" >&2; }
 
 if [[ "$SKIP_CLAUDE_CREDS" == true ]] || [[ "$SKIP_OPENCODE_AUTH" == true ]]; then
-    # Create a temporary compose override that replaces the volumes list,
-    # including only the mounts whose source files actually exist.
     OVERRIDE_FILE=$(mktemp /tmp/compose-override-XXXXXX.yaml)
     trap "rm -f '$OVERRIDE_FILE'" EXIT
 
@@ -158,7 +132,6 @@ services:
   dev-sandbox:
     volumes:
       - \${SANDBOX_WORKSPACE:-.}:/workspace/project:rw
-      - ${SCRIPT_DIR}:/workspace/sandbox:rw
       - ~/.gitconfig:/home/dev/.gitconfig:ro
       - ~/.ssh:/home/dev/.ssh:ro
 YAML
