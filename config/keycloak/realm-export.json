@@ -1,0 +1,120 @@
+{
+  "realm": "workspace-agent",
+  "enabled": true,
+  "displayName": "Workspace Agent",
+  "registrationAllowed": true,
+  "registrationEmailAsUsername": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "sslRequired": "none",
+  "roles": {
+    "realm": [
+      {
+        "name": "operator",
+        "description": "Full workspace operator — can approve plans, manage workers, grant privileges"
+      },
+      {
+        "name": "viewer",
+        "description": "Read-only access to dashboards and task status"
+      }
+    ]
+  },
+  "defaultRoles": ["viewer"],
+  "clients": [
+    {
+      "clientId": "caddy-auth",
+      "name": "Caddy Authentication Gateway",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "caddy-auth-secret-change-me",
+      "redirectUris": [
+        "https://localhost:8443/*",
+        "https://*.localhost/*",
+        "http://localhost:8080/*"
+      ],
+      "webOrigins": ["+"],
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "authorizationServicesEnabled": false,
+      "fullScopeAllowed": true,
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "profile",
+        "roles",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "offline_access"
+      ],
+      "protocolMappers": [
+        {
+          "name": "realm-roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "multivalued": "true",
+            "userinfo.token.claim": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "realm_roles",
+            "jsonType.label": "String"
+          }
+        },
+        {
+          "name": "email",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "userinfo.token.claim": "true",
+            "user.attribute": "email",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "email",
+            "jsonType.label": "String"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "mattermost",
+      "name": "Mattermost",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "mattermost-secret-change-me",
+      "redirectUris": [
+        "https://localhost:8443/mm/*",
+        "https://mm.localhost/*",
+        "http://mattermost:8065/*"
+      ],
+      "webOrigins": ["+"],
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "fullScopeAllowed": true
+    }
+  ],
+  "scopeMappings": [
+    {
+      "client": "caddy-auth",
+      "roles": ["operator", "viewer"]
+    }
+  ],
+  "clientScopeMappings": {},
+  "internationalizationEnabled": false,
+  "supportedLocales": [],
+  "authenticationFlows": [],
+  "identityProviders": [],
+  "identityProviderMappers": [],
+  "components": {},
+  "smtpServer": {}
+}

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Standalone launcher for the AI development sandbox.
-# Copy this file and docker-compose.yaml into your project root.
+# Copy this file and compose.yaml into your project root.
 # Requires: ai-dev-sandbox:latest image (build once from the main sandbox repo)
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -147,9 +147,9 @@ YAML
 YAML
     fi
 
-    COMPOSE_FILES=(-f "$SCRIPT_DIR/docker-compose.yaml" -f "$OVERRIDE_FILE")
+    COMPOSE_FILES=(-f "$SCRIPT_DIR/compose.yaml" -f "$OVERRIDE_FILE")
 else
-    COMPOSE_FILES=(-f "$SCRIPT_DIR/docker-compose.yaml")
+    COMPOSE_FILES=(-f "$SCRIPT_DIR/compose.yaml")
 fi
 
 exec docker compose "${COMPOSE_FILES[@]}" run --rm \

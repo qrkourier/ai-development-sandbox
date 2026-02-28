@@ -64,7 +64,7 @@ preflight() {
 ensure_image() {
     if ! docker image inspect ai-dev-sandbox:latest &>/dev/null; then
         echo "Image ai-dev-sandbox:latest not found — building..." >&2
-        docker compose -f "$SCRIPT_DIR/docker-compose.yaml" build
+        docker compose -f "$SCRIPT_DIR/compose.yaml" build
     fi
 }
 
@@ -113,7 +113,7 @@ COMMAND="${1:-bash}"
 # Handle build command separately (no preflight needed beyond docker check)
 if [[ "$COMMAND" == "build" ]]; then
     preflight
-    exec docker compose -f "$SCRIPT_DIR/docker-compose.yaml" build
+    exec docker compose -f "$SCRIPT_DIR/compose.yaml" build
 fi
 
 # Shift past the command name so remaining args are forwarded
@@ -174,9 +174,9 @@ YAML
 YAML
     fi
 
-    COMPOSE_FILES=(-f "$SCRIPT_DIR/docker-compose.yaml" -f "$OVERRIDE_FILE")
+    COMPOSE_FILES=(-f "$SCRIPT_DIR/compose.yaml" -f "$OVERRIDE_FILE")
 else
-    COMPOSE_FILES=(-f "$SCRIPT_DIR/docker-compose.yaml")
+    COMPOSE_FILES=(-f "$SCRIPT_DIR/compose.yaml")
 fi
 
 exec docker compose "${COMPOSE_FILES[@]}" run --rm \

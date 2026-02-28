@@ -1,0 +1,69 @@
+# ============================================================
+# Workspace Agent — Workspace Configuration
+# Committed to git. No secrets here (use .env for those).
+# ============================================================
+
+name: workspace-agent
+
+# Projects managed by this workspace
+projects:
+  # Example: uncomment and adjust for your projects
+  # - alias: ziti
+  #   path: ~/Sites/netfoundry/github/ziti
+  #   isolation: worktree     # worktree (preferred) | bind | copy
+  # - alias: zrok
+  #   path: ~/Sites/netfoundry/github/zrok
+  #   isolation: worktree
+
+# Privilege catalog — every privilege beyond sandboxed filesystem
+# read/write requires operator approval in the task's Mattermost thread.
+privileges:
+  - id: web-access
+    description: "HTTP/HTTPS access to public internet"
+    grant: per-task
+
+  - id: github-token
+    description: "GitHub API token for PR operations"
+    token_env: GITHUB_TOKEN
+    grant: per-task
+
+  - id: obsidian-vault
+    description: "Read-only access to project Obsidian vault"
+    mount: ~/Documents/Obsidian/ProjectNotes
+    mode: readonly
+    grant: per-task
+
+  # Add more privileges as needed:
+  # - id: acme-mcp
+  #   description: "ACME certificate management MCP server"
+  #   grant: per-task
+
+# Model configuration
+models:
+  preprocessing: "qwen2.5-coder:7b"
+  local_worker: "qwen2.5-coder:32b"
+  frontier_worker: "claude-opus-4-6"
+  embeddings: "nomic-embed-text"
+
+# LiteLLM routing
+litellm:
+  routing_strategy: "simple-shuffle"
+  fallback_models: []  # populated dynamically when operator provides keys
+
+# Mattermost integration
+mattermost:
+  channel: dev-agent
+
+# Supervision settings
+supervision:
+  stuck_timeout_minutes: 5
+  max_spawn_retries: 3
+  token_budget_per_task: 100000
+  resource_sample_interval_seconds: 60
+
+# System resource alert thresholds
+alerts:
+  gpu_utilization_percent: 95
+  gpu_alert_duration_minutes: 5
+  ram_available_percent_min: 10
+  disk_free_gb_min: 5

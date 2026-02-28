@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Workspace Agent Dashboard</title>
+<style>
+:root {
+  --bg: #1a1b26;
+  --fg: #c0caf5;
+  --accent: #7aa2f7;
+  --green: #9ece6a;
+  --yellow: #e0af68;
+  --red: #f7768e;
+  --border: #3b4261;
+  --card-bg: #24283b;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', monospace;
+  background: var(--bg);
+  color: var(--fg);
+  line-height: 1.6;
+}
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 1.5rem;
+}
+header h1 { font-size: 1.25rem; color: var(--accent); }
+.traffic-light {
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  font-weight: bold;
+  font-size: 0.875rem;
+}
+.traffic-light.green { background: var(--green); color: #1a1b26; }
+.traffic-light.yellow { background: var(--yellow); color: #1a1b26; }
+.traffic-light.red { background: var(--red); color: #1a1b26; }
+.grid {
+  display: grid;
+  gap: 1rem;
+}
+@media (min-width: 768px) {
+  .grid { grid-template-columns: 1fr 1fr; }
+}
+@media (min-width: 1024px) {
+  .grid { grid-template-columns: 1fr 1fr 1fr; }
+}
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+}
+.card h2 { font-size: 0.875rem; color: var(--accent); margin-bottom: 0.75rem; }
+.metric { font-size: 1.5rem; font-weight: bold; }
+.metric-label { font-size: 0.75rem; color: #565f89; }
+table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid var(--border); }
+th { color: var(--accent); font-size: 0.75rem; text-transform: uppercase; }
+.status-running { color: var(--green); }
+.status-stuck { color: var(--yellow); }
+.status-failed { color: var(--red); }
+.status-hijacked { color: var(--yellow); }
+.status-completed { color: var(--fg); }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Workspace Agent</h1>
+    <span class="traffic-light {{.TrafficLight}}">{{.TrafficLight}}</span>
+  </header>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Manager</h2>
+      <div class="metric">{{if .ManagerPID}}PID {{.ManagerPID}}{{else}}Not Running{{end}}</div>
+      <div class="metric-label">Manager Process</div>
+    </div>
+
+    {{if .Resources}}
+    <div class="card">
+      <h2>CPU / RAM</h2>
+      <div class="metric">{{printf "%.1f" .Resources.CPUPercent}}%</div>
+      <div class="metric-label">CPU &middot; {{.Resources.RAMUsedMB}}MB / {{.Resources.RAMTotalMB}}MB RAM</div>
+    </div>
+    <div class="card">
+      <h2>GPU / Disk</h2>
+      <div class="metric">{{printf "%.1f" .Resources.GPUPercent}}%</div>
+      <div class="metric-label">GPU &middot; {{printf "%.1f" .Resources.DiskUsedGB}}GB / {{printf "%.1f" .Resources.DiskTotalGB}}GB Disk</div>
+    </div>
+    {{end}}
+  </div>
+
+  <div class="card" style="margin-top: 1rem;">
+    <h2>Workers</h2>
+    {{if .Workers}}
+    <table>
+      <tr>
+        <th>ID</th>
+        <th>Project</th>
+        <th>Type</th>
+        <th>Status</th>
+        <th>Tokens</th>
+      </tr>
+      {{range .Workers}}
+      <tr>
+        <td>{{.ID}}</td>
+        <td>{{.Project}}</td>
+        <td>{{.WorkerType}}</td>
+        <td class="status-{{.Status}}">{{.Status}}</td>
+        <td>{{.TokenCount}}</td>
+      </tr>
+      {{end}}
+    </table>
+    {{else}}
+    <p style="color: #565f89;">No active workers.</p>
+    {{end}}
+  </div>
+</div>
+
+<script>
+const ws = new WebSocket('ws://' + location.host + '/ws');
+ws.onmessage = function(e) {
+  // Reload on state updates
+  location.reload();
+};
+ws.onclose = function() {
+  setTimeout(() => location.reload(), 5000);
+};
+</script>
+</body>
+</html>

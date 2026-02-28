@@ -1,0 +1,35 @@
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# System packages
+RUN apt-get update && apt-get install -y \
+    git curl build-essential python3 python3-pip \
+    unzip tree sudo jq tmux \
+    && rm -rf /var/lib/apt/lists/*
+
+# Node.js LTS
+RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - \
+    && apt-get install -y nodejs
+
+# Non-root user
+RUN useradd -m -s /bin/bash dev \
+    && echo "dev ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+USER dev
+WORKDIR /home/dev
+ENV PATH="/home/dev/.local/bin:$PATH"
+
+# OpenCode
+RUN curl -fsSL https://opencode.ai/install | bash
+
+# Default OpenCode config for Ollama
+RUN mkdir -p /home/dev/.config/opencode
+COPY --chown=dev:dev config/opencode-config.json /home/dev/.config/opencode/config.json 2>/dev/null || true
+
+COPY --chown=dev:dev rules/sandbox.md /home/dev/.sandbox-rules/sandbox.md
+
+WORKDIR /workspace/project
+
+ENTRYPOINT ["opencode"]
+CMD []

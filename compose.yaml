@@ -1,0 +1,308 @@
+# ============================================================
+# Workspace Agent — Docker Compose Stack
+# ============================================================
+# Port strategy: Only Caddy publishes ports to the host.
+# All other services use expose: (Docker-internal only).
+# Remote access is via OpenZiti overlay, not published ports.
+# ============================================================
+
+networks:
+  workspace-internal:
+    name: workspace-internal
+  workspace-sandbox:
+    name: workspace-sandbox
+    internal: true  # no internet egress
+
+volumes:
+  postgres-data:
+  mattermost-data:
+  ollama-models:
+  open-webui-data:
+  caddy-data:
+  caddy-config:
+  litellm-config:
+  qdrant-data:
+  wikijs-data:
+  silverbullet-data:
+  kb-data:
+  ziti-host:
+
+services:
+
+  # ---- Reverse Proxy + Auth Gateway ----
+  caddy:
+    build:
+      context: .
+      dockerfile: Dockerfile.caddy
+    restart: unless-stopped
+    networks:
+      - workspace-internal
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+      - ./config/Caddyfile.${TLS_MODE:-local}:/etc/caddy/Caddyfile:ro
+    ports:
+      - "8080:80"
+      - "${HTTPS_PORT:-8443}:${HTTPS_PORT:-8443}"
+    environment:
+      - DOMAIN=${DOMAIN:-localhost}
+      - HTTPS_PORT=${HTTPS_PORT:-8443}
+      - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN:-}
+      - TLS_MODE=${TLS_MODE:-local}
+    depends_on:
+      keycloak:
+        condition: service_started
+
+  # ---- Database ----
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    networks:
+      - workspace-internal
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./config/postgres/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh:ro
+    expose:
+      - "5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme-postgres-root}
+      KEYCLOAK_DB_USER: ${KEYCLOAK_DB_USER:-keycloak}
+      KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-changeme-keycloak-db}
+      MATTERMOST_DB_USER: ${MATTERMOST_DB_USER:-mattermost}
+      MATTERMOST_DB_PASSWORD: ${MATTERMOST_DB_PASSWORD:-changeme-mattermost-db}
+      WIKIJS_DB_USER: ${WIKIJS_DB_USER:-wikijs}
+      WIKIJS_DB_PASSWORD: ${WIKIJS_DB_PASSWORD:-changeme-wikijs-db}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---- Identity Provider ----
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    restart: unless-stopped
+    networks:
+      - workspace-internal
+    expose:
+      - "8080"
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: ${KEYCLOAK_DB_USER:-keycloak}
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-changeme-keycloak-db}
+      KC_HOSTNAME_STRICT: "false"
+      KC_HTTP_ENABLED: "true"
+      KC_PROXY_HEADERS: xforwarded
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-changeme-keycloak-admin}
+    volumes:
+      - ./config/keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+    command: start-dev --import-realm
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ---- Chat Interface ----
+  mattermost:
+    image: mattermost/mattermost-team-edition:latest
+    restart: unless-stopped
+    networks:
+      - workspace-internal
+    volumes:
+      - mattermost-data:/mattermost/data
+    expose:
+      - "8065"
+    environment:
+      MM_SQLSETTINGS_DRIVERNAME: postgres
+      MM_SQLSETTINGS_DATASOURCE: ${MM_SQLSETTINGS_DATASOURCE:-postgres://mattermost:changeme-mattermost-db@postgres:5432/mattermost?sslmode=disable}
+      MM_SERVICESETTINGS_SITEURL: ${MM_SITE_URL:-https://localhost:${HTTPS_PORT:-8443}/mm}
+      MM_SERVICESETTINGS_LISTENADDRESS: ":8065"
+      MM_PLUGINSETTINGS_ENABLEUPLOADS: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ---- Local Model Serving ----
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    networks:
+      - workspace-internal
+      - workspace-sandbox
+    volumes:
+      - ollama-models:/root/.ollama
+    expose:
+      - "11434"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # ---- Model Interaction UI ----
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    restart: unless-stopped
+    networks:
+      - workspace-internal
+    volumes:
+      - open-webui-data:/app/backend/data
+    expose:
+      - "8080"
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+      WEBUI_AUTH: "false"
+    depends_on:
+      - ollama
+
+  # ---- Model Routing ----
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    restart: unless-stopped
+    networks:
+      - workspace-internal
+      - workspace-sandbox
+    volumes:
+      - ./config/litellm_config.yaml:/app/config.yaml:ro
+    expose:
+      - "4000"
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-changeme-litellm-master}
+    command: --config /app/config.yaml --port 4000
+    depends_on:
+      - ollama
+
+  # ---- Vector Storage ----
+  qdrant:
+    image: qdrant/qdrant:latest
+    restart: unless-stopped
+    networks:
+      - workspace-internal
+    volumes:
+      - qdrant-data:/qdrant/storage
+    expose:
+      - "6333"
+
+  # ---- KB Wiki (evaluation candidate 1) ----
+  wikijs:
+    image: ghcr.io/requarks/wiki:2
+    restart: unless-stopped
+    networks:
+      - workspace-internal
+    volumes:
+      - wikijs-data:/wiki/data
+      - kb-data:/wiki/kb:ro
+    expose:
+      - "3000"
+    environment:
+      DB_TYPE: postgres
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: ${WIKIJS_DB_USER:-wikijs}
+      DB_PASS: ${WIKIJS_DB_PASSWORD:-changeme-wikijs-db}
+      DB_NAME: wikijs
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ---- KB Wiki (evaluation candidate 2) ----
+  silverbullet:
+    image: ghcr.io/silverbulletmd/silverbullet:latest
+    restart: unless-stopped
+    networks:
+      - workspace-internal
+    volumes:
+      - silverbullet-data:/space
+      - kb-data:/space/kb
+    expose:
+      - "3000"
+
+  # ---- Secure Remote Access (opt-in) ----
+  ziti-host:
+    image: ${ZITI_HOST_IMAGE:-openziti/ziti-host}:${ZITI_HOST_TAG:-latest}
+    restart: unless-stopped
+    networks:
+      - workspace-internal
+    volumes:
+      - ziti-host:/ziti-edge-tunnel
+    environment:
+      - ZITI_ENROLL_TOKEN=${ZITI_ENROLL_TOKEN:-}
+    profiles:
+      - ziti
+
+  # ---- Workspace Harness (TUI + Web UI + SSH + MM Bridge) ----
+  harness:
+    build:
+      context: ./harness
+      dockerfile: ../Dockerfile.harness
+    restart: unless-stopped
+    networks:
+      - workspace-internal
+    expose:
+      - "8090"
+      - "2222"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - kb-data:/kb
+      - ./workspace.yaml:/app/workspace.yaml:ro
+    environment:
+      MM_WS_URL: ${MM_WS_URL:-ws://mattermost:8065}
+      MM_API_URL: ${MM_API_URL:-http://mattermost:8065}
+      MM_BOT_TOKEN: ${MM_BOT_TOKEN:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    depends_on:
+      - mattermost
+      - ollama
+
+  # ---- Frontier Worker (Claude Code, bypassPermissions) ----
+  # Not started by compose — spawned dynamically by manager
+  # Defined here as a template for documentation
+  dev-sandbox:
+    build: .
+    image: ai-dev-sandbox:latest
+    profiles:
+      - worker
+    networks:
+      - workspace-sandbox
+    volumes:
+      - ${SANDBOX_WORKSPACE:-.}:/workspace/project:rw
+      - .:/workspace/sandbox:rw
+      - ~/.claude/.credentials.json:/home/dev/.claude-credentials/.credentials.json:ro
+      - ~/.local/share/opencode/auth.json:/home/dev/.local/share/opencode/auth.json:ro
+      - ~/.gitconfig:/home/dev/.gitconfig:ro
+      - ~/.ssh:/home/dev/.ssh:ro
+    environment:
+      - CLAUDE_CONFIG_DIR=/home/dev/.claude
+      - ANTHROPIC_API_KEY
+      - OPENAI_API_KEY
+      - GOOGLE_API_KEY
+      - CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
+    working_dir: /workspace/project
+    stdin_open: true
+    tty: true
+
+  # ---- Local Worker (OpenCode + Ollama) ----
+  # Not started by compose — spawned dynamically by manager
+  local-sandbox:
+    build:
+      context: .
+      dockerfile: Dockerfile.local-worker
+    image: local-worker:latest
+    profiles:
+      - worker
+    networks:
+      - workspace-sandbox
+    volumes:
+      - ${SANDBOX_WORKSPACE:-.}:/workspace/project:rw
+    environment:
+      - OPENAI_API_BASE=http://ollama:11434/v1
+      - OPENAI_API_KEY=ollama
+    working_dir: /workspace/project
+    stdin_open: true
+    tty: true

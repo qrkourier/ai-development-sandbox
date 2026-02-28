@@ -106,7 +106,7 @@ To add project-specific rules, create `.sandbox-rules.md` in your project:
 
 ## Template for Other Projects
 
-The `template/` directory contains a minimal `dev` script and `docker-compose.yaml` that can be copied into any project to use the sandbox without the full repo. See `template/README.md` for setup instructions.
+The `template/` directory contains a minimal `dev` script and `compose.yaml` that can be copied into any project to use the sandbox without the full repo. See `template/README.md` for setup instructions.
 
 ## What's Inside
 

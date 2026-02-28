@@ -1,0 +1,49 @@
+# ============================================================
+# Caddyfile — DNS mode (subdomain-based, ACME DNS-01)
+# Requires: DOMAIN, CLOUDFLARE_API_TOKEN in .env
+# ============================================================
+
+{
+	email admin@{$DOMAIN}
+	acme_dns cloudflare {$CLOUDFLARE_API_TOKEN}
+}
+
+# --- Keycloak (no auth gate — it IS the auth provider) ---
+auth.{$DOMAIN}:{$HTTPS_PORT} {
+	reverse_proxy keycloak:8080
+}
+
+# --- Mattermost ---
+mm.{$DOMAIN}:{$HTTPS_PORT} {
+	reverse_proxy mattermost:8065
+}
+
+# --- Open-WebUI ---
+webui.{$DOMAIN}:{$HTTPS_PORT} {
+	reverse_proxy open-webui:8080
+}
+
+# --- Wiki.js ---
+wiki.{$DOMAIN}:{$HTTPS_PORT} {
+	reverse_proxy wikijs:3000
+}
+
+# --- SilverBullet ---
+kb.{$DOMAIN}:{$HTTPS_PORT} {
+	reverse_proxy silverbullet:3000
+}
+
+# --- Harness Web UI ---
+dash.{$DOMAIN}:{$HTTPS_PORT} {
+	reverse_proxy harness:8090
+}
+
+# --- LiteLLM (internal API, auth required) ---
+llm.{$DOMAIN}:{$HTTPS_PORT} {
+	reverse_proxy litellm:4000
+}
+
+# --- Qdrant (internal, admin only) ---
+vectors.{$DOMAIN}:{$HTTPS_PORT} {
+	reverse_proxy qdrant:6333
+}

@@ -1,0 +1,58 @@
+# ============================================================
+# Caddyfile — Localhost mode (path-based, self-signed TLS)
+# No DNS zone or Cloudflare token needed.
+# Browser will show certificate warning (expected).
+# ============================================================
+
+{
+	local_certs
+}
+
+:{$HTTPS_PORT} {
+	tls internal
+
+	# --- Keycloak ---
+	handle_path /auth/* {
+		reverse_proxy keycloak:8080
+	}
+
+	# --- Mattermost ---
+	handle_path /mm/* {
+		reverse_proxy mattermost:8065
+	}
+
+	# --- Open-WebUI ---
+	handle_path /webui/* {
+		reverse_proxy open-webui:8080
+	}
+
+	# --- Wiki.js ---
+	handle_path /wiki/* {
+		reverse_proxy wikijs:3000
+	}
+
+	# --- SilverBullet ---
+	handle_path /kb/* {
+		reverse_proxy silverbullet:3000
+	}
+
+	# --- Harness Web UI ---
+	handle_path /dash/* {
+		reverse_proxy harness:8090
+	}
+
+	# --- LiteLLM ---
+	handle_path /llm/* {
+		reverse_proxy litellm:4000
+	}
+
+	# --- Qdrant ---
+	handle_path /vectors/* {
+		reverse_proxy qdrant:6333
+	}
+
+	# --- Default: landing page ---
+	handle {
+		respond "Workspace Agent — use /auth, /mm, /webui, /wiki, /kb, /dash, /llm, /vectors" 200
+	}
+}

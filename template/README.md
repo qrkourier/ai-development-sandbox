@@ -15,10 +15,10 @@ This creates the `ai-dev-sandbox:latest` image that the template references.
 
 ## Setup
 
-Copy `dev` and `docker-compose.yaml` into your project root:
+Copy `dev` and `compose.yaml` into your project root:
 
 ```bash
-cp template/dev template/docker-compose.yaml /path/to/your-project/
+cp template/dev template/compose.yaml /path/to/your-project/
 ```
 
 ## Usage
@@ -46,7 +46,7 @@ cd ~/projects/myapp
 
 ## Customization
 
-Edit `docker-compose.yaml` to add:
+Edit `compose.yaml` to add:
 - Additional volume mounts (shared libraries, documentation, etc.)
 - Extra environment variables
 - Port mappings
