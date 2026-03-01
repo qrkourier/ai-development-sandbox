@@ -31,7 +31,7 @@ model_list:
       model: "claude-sonnet-4-6"
       api_key: "os.environ/ANTHROPIC_API_KEY"
 
-  # Fallback (populated when operator provides keys)
+  # Fallback (populated when director provides keys)
   # - model_name: "code-fallback"
   #   litellm_params:
   #     model: "gpt-4o"

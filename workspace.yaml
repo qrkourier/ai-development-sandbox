@@ -16,7 +16,7 @@ projects:
   #   isolation: worktree
 
 # Privilege catalog — every privilege beyond sandboxed filesystem
-# read/write requires operator approval in the task's Mattermost thread.
+# read/write requires director approval in the task's Mattermost thread.
 privileges:
   - id: web-access
     description: "HTTP/HTTPS access to public internet"
@@ -48,7 +48,7 @@ models:
 # LiteLLM routing
 litellm:
   routing_strategy: "simple-shuffle"
-  fallback_models: []  # populated dynamically when operator provides keys
+  fallback_models: []  # populated dynamically when director provides keys
 
 # Mattermost integration
 mattermost:

@@ -13,8 +13,8 @@
   "roles": {
     "realm": [
       {
-        "name": "operator",
-        "description": "Full workspace operator — can approve plans, manage workers, grant privileges"
+        "name": "director",
+        "description": "Full workspace director — approves plans, governs managers, grants privileges"
       },
       {
         "name": "viewer",
@@ -106,7 +106,7 @@
   "scopeMappings": [
     {
       "client": "caddy-auth",
-      "roles": ["operator", "viewer"]
+      "roles": ["director", "viewer"]
     }
   ],
   "clientScopeMappings": {},

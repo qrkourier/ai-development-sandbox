@@ -45,7 +45,7 @@ Examples of privileges that must be requested:
 
 ## Tool Call Transparency
 
-Every significant action you take is logged and visible to the human operator. This includes:
+Every significant action you take is logged and visible to the director. This includes:
 - File writes and edits
 - Bash command execution
 - Web fetches (if web-access is granted)

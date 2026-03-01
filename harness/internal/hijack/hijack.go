@@ -12,7 +12,7 @@ import (
 	"github.com/netfoundry/workspace-agent/harness/internal/state"
 )
 
-// Monitor watches for human hijack of worker containers via tmux client count
+// Monitor watches for director hijack of worker containers via tmux client count
 type Monitor struct {
 	state  *state.AppState
 	logger *log.Logger
@@ -51,10 +51,10 @@ func (m *Monitor) checkAllWorkers() {
 			continue // tmux not running in this container, skip
 		}
 		if clients > 0 && w.Status == state.WorkerRunning {
-			m.logger.Info("Human hijack detected", "worker", w.ID, "clients", clients)
+			m.logger.Info("Director hijack detected", "worker", w.ID, "clients", clients)
 			w.Status = state.WorkerHijacked
 		} else if clients == 0 && w.Status == state.WorkerHijacked {
-			m.logger.Info("Human detached from worker", "worker", w.ID)
+			m.logger.Info("Director detached from worker", "worker", w.ID)
 			w.Status = state.WorkerRunning
 		}
 	}
@@ -74,7 +74,7 @@ func getTmuxClientCount(containerID string) (int, error) {
 	return len(strings.Split(lines, "\n")), nil
 }
 
-// GetAttachCommand returns the command for a human to attach to a worker
+// GetAttachCommand returns the command for the director to attach to a worker
 func GetAttachCommand(containerID string) string {
 	return fmt.Sprintf("docker exec -it %s tmux attach", containerID)
 }
